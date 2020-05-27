@@ -6,6 +6,8 @@ In its pre-packaged forms (currently only for macOS), it can act as a stand-alon
 (i.e. it packages the entire storm-analysis toolkit and does not require users to do any package installation or 
 use the commandline).
 
+![screenshot](screenshot.png)
+
 ## Features ##
 - Drag-and-drop loading of images, STORM parameters, or molecule list files.
 - Image viewer supports zoom, pan, and dragging to view the results of your fitting.
