@@ -1049,7 +1049,7 @@ class Analyzer(App):
         splitpath = os.path.split(file_path.decode())
         splitfile = os.path.splitext(file_path.decode())
 
-        if splitfile[1] == '.dax':
+        if splitfile[1] == '.dax' or splitfile[1] == '.tif' or splitfile[1] == '.spe':
             self.root.loadDax(splitpath[0], splitpath[1])
 
         elif splitfile[1] == '.xml':
