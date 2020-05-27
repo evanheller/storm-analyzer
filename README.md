@@ -16,6 +16,6 @@ use the commandline).
 - Editable parameters are pulled from your storm-analysis installation, so as storm-analysis parameters evolve, so does the editor.
 - Edited parameters can be exported for use in other workflows.
 
-
-
+## Pre-packaged versions ##
+[macOS](https://github.com/evanheller/storm-analyzer/releases/download/0.1/storm-analyzer.dmg)
 
