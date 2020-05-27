@@ -1,0 +1,278 @@
+#:import win kivy.core.window
+<Interface>:
+    orientation: 'horizontal'
+    daxviewer: daxviewer
+    analysis_panel: analysis_panel
+    frame_number: frame_number
+    
+    AnchorLayout:
+        anchor_x: 'left'
+        anchor_y: 'bottom'
+
+        
+        FloatLayout:
+            canvas.before:
+                StencilPush
+                # This makes the mask
+                Rectangle:
+                    size: self.size
+                    pos: 0,200 
+                StencilUse
+                
+                # Draw a rectangle as background
+                Color: 
+                    rgba: 0.3,0.3,0.3,0.5
+                Rectangle:
+                    size: self.size
+                    pos: 0,200 
+
+            canvas.after:
+                StencilUnUse
+                # Erase the stencil
+                #Rectangle:
+                #    size: self.size
+                #    pos: 0,200 
+                StencilPop
+
+        
+            DaxViewer:
+                id: daxviewer
+                slider_curframe: slider_curframe
+                slider_contrast: rangeContrast
+
+
+
+        FloatLayout:
+            size_hint: 1, None
+            Label:
+                pos_hint: {'x': .01, 'y': 1.6}
+                size_hint: 1, None 
+                text_size: self.size 
+                halign: 'left'
+                text: 'Frame'
+
+            Label:
+                id: frame_number
+                pos_hint: {'x': -0.01, 'y': 1.6}
+                size_hint: 1, None 
+                text_size: self.size 
+                halign: 'right'
+                text: '0'
+
+            Slider:
+                #pos: 5,80
+                id: slider_curframe
+                pos_hint: {'x': 0, 'y': .8}
+                size_hint: 1, None
+                min: 0
+                max: 0
+                cursor_size: ('24sp', '24sp')
+                orientation: 'horizontal'
+                step: 1
+                on_value: root.handleSliderCurFrame(self.value)
+
+        FloatLayout:
+            size_hint: 1, None 
+            Label:
+                pos_hint: {'x': .01, 'y': .65}
+                size_hint: 1, None 
+                text_size: self.size 
+                halign: 'left'
+                text: 'Contrast'
+
+            RangeSlider:
+                id: rangeContrast
+                cursor_size: ('24sp', '24sp')
+                orientation: 'horizontal'
+                on_value: root.handleSliderContrast(self.value)
+                
+    
+        AnchorLayout:
+            anchor_x: 'left'
+            anchor_y: 'top'
+
+
+            ActionBar:
+                pos_hint: {'top':1}
+
+                ActionView:
+                    use_separator: True
+
+                    ActionPrevious:
+                        app_icon: ''
+                        title: 'Analyzer'
+                        with_previous: False
+
+                    ActionGroup:
+                        text: 'File...'
+                        dropdown_width: '150dp'
+
+                        ActionButton:
+                            text: 'Load DAX'
+                            on_press: root.handleLoadFile('dax')
+
+                        ActionButton:
+                            text: 'Load MolList'
+                            on_press: root.handleLoadFile('mol')
+
+                        ActionButton:
+                            text: 'Load Parameters'
+                            on_press: root.handleLoadFile('param')
+
+                        ActionButton:
+                            text: 'Save Parameters'
+                            on_press: root.handleSaveParams()
+
+                        ActionButton:
+                            text: 'Z calib string'
+                            on_press: root.handleLoadZstring()
+
+
+                    ActionGroup:
+                        text: 'Batch...'
+                        dropdown_width: '150dp' 
+
+                        ActionButton:
+                            text: 'Set DAO path'
+                            on_press: root.handleLoadFile('dao')
+
+                        ActionButton:
+                            text: 'Analyze directory'
+                            on_press: root.handleLoadFile('dir')
+
+
+                    ActionButton:
+                        text: 'Analyze frame'
+                        on_press: root.handleAnalyzeFrame()
+
+                    ActionButton:
+                        text: 'Analyze file'
+                        on_press: root.handleAnalyzeDax()
+
+
+
+    Splitter:
+        sizable_from: 'left'
+        strip_size: 12 
+        size_hint_x: .5 
+
+        TabbedPanel:
+            id: analysis_panel
+            tab_pos: 'right_top'
+            tab_width: self.parent.width/2.5
+            do_default_tab: False
+
+
+  
+<DaxViewer>:
+    pos: 0,50
+    auto_bring_to_front: False
+
+
+<Image>:
+    allow_stretch: True
+    #on_size: self.center = win.Window.center
+
+<LoadDialog>:
+    filechooser: filechooser
+
+    BoxLayout:
+        size: root.size  
+        pos:  root.pos
+        orientation: "vertical"
+        FileChooserIconView:
+            id: filechooser
+            dirselect: True
+            path: '~'
+
+        BoxLayout:
+            size_hint_y: None
+            height: 50
+            Button:
+                text: "Cancel"
+                on_release: root.cancel()
+
+            Button:
+                text: "Load"
+                on_release: root.load( filechooser.path, filechooser.selection[0])
+
+
+<SaveDialog>:
+    text_input: text_input
+    filechooser: filechooser
+
+    BoxLayout:
+        size: root.size
+        pos: root.pos
+        orientation: "vertical"
+        spacing: 10
+
+        FileChooserIconView:
+            id: filechooser
+            dirselect: True
+            on_selection: text_input.text = self.selection and self.selection[0] or ''
+
+        TextInput:
+            id: text_input
+            size_hint_y: None
+            height: 50
+            multiline: False
+
+        BoxLayout:
+            size_hint_y: None
+            height: 50
+
+            Button:
+                text: "Cancel"
+                on_release: root.cancel()
+
+            Button:
+                text: "Save"
+                on_release: root.save(filechooser.path, text_input.text)
+
+
+<PopupDialog>:
+    messagelabel: messagelabel 
+
+    BoxLayout:
+        size: root.size
+        pos: root.pos
+        orientation: "vertical"
+        spacing: 10
+
+        Label:
+            id: messagelabel
+
+        BoxLayout:
+            size_hint_y: None
+            height: 50
+            Button:
+                text: "OK"
+                on_release: root.ok() 
+
+
+
+<StringDialog>:
+    stringinput: stringinput
+
+    BoxLayout:
+        size: root.size  
+        pos:  root.pos
+        spacing: 10
+        orientation: "vertical"
+
+        TextInput:
+            id: stringinput
+
+        BoxLayout:
+            size_hint_y: None
+            height: 50
+            Button:
+                text: "Cancel"
+                on_release: root.cancel()
+
+            Button:
+                text: "Load"
+                on_release: root.load(stringinput.text)
+
+    
