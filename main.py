@@ -460,7 +460,7 @@ class Interface(BoxLayout):
               "ParametersMultiplaneArb",
               "ParametersMultiplaneDao",
               "ParametersSpliner",
-              "ParametersSplinerFISTA",
+              "ParametersFISTA",
               "ParametersPSFFFT",
               "ParametersPupilFn"]
 
