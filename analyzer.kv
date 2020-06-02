@@ -5,18 +5,14 @@
     analysis_panel: analysis_panel
     frame_number: frame_number
     
-    AnchorLayout:
-        anchor_x: 'left'
-        anchor_y: 'bottom'
-
-        
+    FloatLayout:
         FloatLayout:
             canvas.before:
                 StencilPush
                 # This makes the mask
                 Rectangle:
                     size: self.size
-                    pos: 0,200 
+                    pos: 0,dp(100)
                 StencilUse
                 
                 # Draw a rectangle as background
@@ -24,7 +20,7 @@
                     rgba: 0.3,0.3,0.3,0.5
                 Rectangle:
                     size: self.size
-                    pos: 0,200 
+                    pos: 0,dp(100) 
 
             canvas.after:
                 StencilUnUse
@@ -34,62 +30,11 @@
                 #    pos: 0,200 
                 StencilPop
 
-        
+
             DaxViewer:
                 id: daxviewer
                 slider_curframe: slider_curframe
                 slider_contrast: rangeContrast
-
-
-
-        FloatLayout:
-            size_hint: 1, None
-            Label:
-                pos_hint: {'x': .01, 'y': 1.6}
-                size_hint: 1, None 
-                text_size: self.size 
-                halign: 'left'
-                text: 'Frame'
-
-            Label:
-                id: frame_number
-                pos_hint: {'x': -0.01, 'y': 1.6}
-                size_hint: 1, None 
-                text_size: self.size 
-                halign: 'right'
-                text: '0'
-
-            Slider:
-                #pos: 5,80
-                id: slider_curframe
-                pos_hint: {'x': 0, 'y': .8}
-                size_hint: 1, None
-                min: 0
-                max: 0
-                cursor_size: ('24sp', '24sp')
-                orientation: 'horizontal'
-                step: 1
-                on_value: root.handleSliderCurFrame(self.value)
-
-        FloatLayout:
-            size_hint: 1, None 
-            Label:
-                pos_hint: {'x': .01, 'y': .65}
-                size_hint: 1, None 
-                text_size: self.size 
-                halign: 'left'
-                text: 'Contrast'
-
-            RangeSlider:
-                id: rangeContrast
-                cursor_size: ('24sp', '24sp')
-                orientation: 'horizontal'
-                on_value: root.handleSliderContrast(self.value)
-                
-    
-        AnchorLayout:
-            anchor_x: 'left'
-            anchor_y: 'top'
 
 
             ActionBar:
@@ -150,6 +95,65 @@
                         on_press: root.handleAnalyzeDax()
 
 
+        FloatLayout:
+
+            Label:
+                #pos_hint: {'x': 0.01, 'y': .65 }
+                pos: sp(2), sp(76)
+                #pos_hint: {'x': 0.01, 'y': 0 }
+                size_hint: 1, None 
+                text_size: self.size 
+                halign: 'left'
+                text: 'Frame'
+
+            Label:
+                id: frame_number
+                #pos_hint: {'x': -.01, 'y': .65}
+                pos: -sp(4), sp(76)
+                size_hint: 1, None 
+                text_size: self.size 
+                halign: 'right'
+                text: '0'
+
+
+            Slider:
+                id: slider_curframe
+                #pos_hint: {'x': 0, 'y': 0.1}
+                size_hint: 1, None
+                #center: sp(24),sp(65)
+                center_y: sp(65)
+                #pos: 0, sp(40)
+
+                min: 0
+                max: 0
+                cursor_size: ('24sp', '24sp')
+                orientation: 'horizontal'
+                step: 1
+                on_value: root.handleSliderCurFrame(self.value)
+
+        FloatLayout:
+            size_hint: 1, None 
+            pos_hint: {'x': 0, 'y':0 }
+
+            Label:
+                #pos_hint: {'x': 0.01, 'y': .75}
+                pos: sp(2), sp(34)
+                size_hint: 1, None 
+                text_size: self.size 
+                halign: 'left'
+                text: 'Contrast'
+
+            RangeSlider:
+                id: rangeContrast
+                #pos_hint: {'x': 0, 'y': 0}
+                center_y: sp(24)
+                #center: sp(24), sp(24)
+                #pos: 0,0 
+                #cursor_size: ('24sp', '24sp')
+                orientation: 'horizontal'
+                on_value: root.handleSliderContrast(self.value)
+            
+    
 
     Splitter:
         sizable_from: 'left'
@@ -165,7 +169,7 @@
 
   
 <DaxViewer>:
-    pos: 0,50
+    pos: 0,dp(25)
     auto_bring_to_front: False
 
 

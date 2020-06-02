@@ -13,8 +13,8 @@ Builder.load_string('''
         Color:
             rgb: 1, 1, 1
         BorderImage:
-            border: (0, 18, 0, 18) if self.orientation == 'horizontal' else (18, 0, 18, 0)
-            pos: (self.x + self.padding, self.center_y - sp(18)) if self.orientation == 'horizontal' else (self.center_x - 18, self.y + self.padding)
+            border: (0, sp(18), 0, sp(18)) if self.orientation == 'horizontal' else (sp(18), 0, sp(18), 0)
+            pos: (self.x + self.padding, self.center_y - sp(18)) if self.orientation == 'horizontal' else (self.center_x - sp(18), self.y + self.padding)
             size: (self.width - self.padding * 2, sp(36)) if self.orientation == 'horizontal' else (sp(36), self.height - self.padding * 2)
             source: 'atlas://data/images/defaulttheme/slider{}_background{}'.format(self.orientation[0], '_disabled' if self.disabled else '')
         Rectangle:
@@ -277,7 +277,10 @@ class RangeSlider(Widget):
         return value
 
     def on_touch_down(self, touch):
-        if self.disabled or not self.collide_point(*touch.pos):
+        (px,py)=touch.pos
+        pos=(px, py+self.padding)
+        #if self.disabled or not self.collide_point(*touch.pos):
+        if self.disabled or not self.collide_point(*pos):
             return
         touch.grab(self)
         t_value = self._touch_normalized_value(touch)

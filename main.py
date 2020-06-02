@@ -17,7 +17,7 @@ from kivy.uix.label import Label
 from kivy.graphics import Line, Color, InstructionGroup
 from kivy.graphics.transformation import Matrix
 from kivy.core.window import Window
-from kivy.metrics import dp
+from kivy.metrics import sp
 from kivy.clock import Clock, mainthread
 from kivy.uix.popup import Popup
 
@@ -553,7 +553,7 @@ class Interface(BoxLayout):
         tv=TreeView(hide_root=True)
         tv.size_hint_y = None
         tv.bind(minimum_height=tv.setter('height'))
-        tv.add_node(TreeViewNode(orientation="horizontal", height=dp(12)))
+        tv.add_node(TreeViewNode(orientation="horizontal", height=sp(12)))
 
         # These are needed for the widget to scroll
         # Also: the ScrollView can have only a single TreeView widget for this
@@ -565,7 +565,7 @@ class Interface(BoxLayout):
         # Spinner box for the fit type
         if "model" not in self.paramWidgets.keys():
             attr="model"
-            n = TreeViewNode(orientation="horizontal", size_hint_y=None, height=dp(24), padding=[18, 12])
+            n = TreeViewNode(orientation="horizontal", size_hint_y=None, height=sp(24), padding=[sp(18), 0])
             n.add_widget(Label(text=attr,  halign="left"))
             spinner = Spinner(text="Z", values = ['Z', '2dfixed', '2d', '3d'])
             spinner.name = attr
@@ -581,7 +581,7 @@ class Interface(BoxLayout):
         # Process some frequently-used params first
         for attr in Interface.node_frequent:
             if attr not in self.paramWidgets.keys():
-                n = TreeViewNode(orientation="horizontal", size_hint_y=None, height=dp(24), padding=[18, 0])
+                n = TreeViewNode(orientation="horizontal", size_hint_y=None, height=sp(24), padding=[sp(18), 0])
                 n.add_widget(Label(text=attr, halign="left"))
 
                 # Make input of the right type (for now, TextInput and
@@ -607,7 +607,7 @@ class Interface(BoxLayout):
         # The rest of the parameters
         for attr in parameters.attr.keys():
             if attr not in self.paramWidgets.keys():
-                n = TreeViewNode(orientation="horizontal", size_hint_y=None, height=dp(24), padding=[18, 0])
+                n = TreeViewNode(orientation="horizontal", size_hint_y=None, height=sp(24), padding=[sp(18), 0])
                 n.add_widget(Label(text=attr, halign="left"))
 
                 # Make input of the right type (for now, TextInput and
@@ -644,13 +644,13 @@ class Interface(BoxLayout):
         if widget_type == "textbox":
             # Implement some input filteers
             if parameter[0] == 'int' or 'int' in parameter[0] and 'float' in parameter[0]:
-                t = TextInput(text="", size_hint_x=.35, multiline=False, input_filter = 'int')
+                t = TextInput(text="", size_hint_x=.35, multiline=False, input_filter = 'int', padding=(sp(6),sp(3),sp(6),sp(3)))
 
             elif parameter[0] == 'float':
-                t = TextInput(text="", size_hint_x=.35, multiline=False, input_filter = 'float')
+                t = TextInput(text="", size_hint_x=.35, multiline=False, input_filter = 'float', padding=(sp(6),sp(3),sp(6),sp(3)))
 
             else:
-                t = TextInput(text="", size_hint_x=.35, multiline=False)
+                t = TextInput(text="", size_hint_x=.35, multiline=False, padding=(sp(6),sp(3),sp(6),sp(3)))
 
             # Avoid complaint about parameter that's (int, float)
             if 'int' in parameter[0] and 'float' in parameter[0]:
@@ -1049,13 +1049,15 @@ class Analyzer(App):
         splitpath = os.path.split(file_path.decode())
         splitfile = os.path.splitext(file_path.decode())
 
-        if splitfile[1] == '.dax' or splitfile[1] == '.tif' or splitfile[1] == '.spe':
+        #if splitfile[1] == '.dax' or splitfile[1] == '.tif' or splitfile[1] == '.spe':
+        if splitfile[1] in ['.dax', '.tif', '.spe']:
             self.root.loadDax(splitpath[0], splitpath[1])
 
         elif splitfile[1] == '.xml':
             self.root.loadParams(splitpath[0], splitpath[1])
 
-        elif splitfile[1] == '.h5' or splitfile[1] == '.hdf' or splitfile[1] == '.hdf5' or splitfile[1] == '.bin':
+        #elif splitfile[1] == '.h5' or splitfile[1] == '.hdf' or splitfile[1] == '.hdf5' or splitfile[1] == '.bin':
+        elif splitfile[1] in ['.h5', '.hdf', '.hdf5', '.bin']:
             self.root.loadMList(splitpath[0], splitpath[1])
 
 
