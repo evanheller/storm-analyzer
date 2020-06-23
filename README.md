@@ -17,6 +17,7 @@ use the commandline).
 - Edited parameters can be exported for use in other workflows.
 
 ## Pre-packaged versions ##
-[macOS](https://github.com/evanheller/storm-analyzer/releases/download/0.1/storm-analyzer.dmg)  
-[Windows](https://github.com/evanheller/storm-analyzer/releases/download/0.1/storm-analyzer.zip)
+[macOS](https://github.com/evanheller/storm-analyzer/releases/download/0.2/storm-analyzer.dmg)  
+[Windows](https://github.com/evanheller/storm-analyzer/releases/download/0.2/storm-analyzer.zip)
+
 
