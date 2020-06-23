@@ -1184,6 +1184,13 @@ class LoadDialog(FloatLayout):
     load = ObjectProperty(None)
     cancel = ObjectProperty(None)
 
+    def loadpath(self, path, filename):
+        if filename:
+            self.load(path, filename[0])
+        else:
+            self.load(path, None)
+
+
 class PopupDialog(FloatLayout):
     ok = ObjectProperty(None)
 
@@ -1214,14 +1221,12 @@ class Analyzer(App):
         splitpath = os.path.split(file_path.decode())
         splitfile = os.path.splitext(file_path.decode())
 
-        #if splitfile[1] == '.dax' or splitfile[1] == '.tif' or splitfile[1] == '.spe':
         if splitfile[1] in ['.dax', '.tif', '.spe']:
             self.root.loadDax(splitpath[0], splitpath[1])
 
         elif splitfile[1] == '.xml':
             self.root.loadParams(splitpath[0], splitpath[1])
 
-        #elif splitfile[1] == '.h5' or splitfile[1] == '.hdf' or splitfile[1] == '.hdf5' or splitfile[1] == '.bin':
         elif splitfile[1] in ['.h5', '.hdf', '.hdf5', '.bin']:
             self.root.loadMList(splitpath[0], splitpath[1])
 

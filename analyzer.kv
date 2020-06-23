@@ -206,7 +206,7 @@
 
             Button:
                 text: "Load"
-                on_release: root.load( filechooser.path, lambda x: filechooser.selection[0] if filechooser.selection else None )
+                on_release: root.loadpath( filechooser.path,  filechooser.selection )
 
 
 <SaveDialog>:
