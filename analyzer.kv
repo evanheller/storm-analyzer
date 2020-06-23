@@ -72,6 +72,10 @@
                             text: 'Z calib string'
                             on_press: root.handleLoadZstring()
 
+                        ActionButton:
+                            text: 'Render to file'
+                            on_press: root.handleRender()
+
 
                     ActionGroup:
                         text: 'Batch...'
@@ -84,6 +88,10 @@
                         ActionButton:
                             text: 'Analyze directory'
                             on_press: root.handleLoadFile('dir')
+
+                        ActionButton:
+                            text: 'Render directory'
+                            on_press: root.handleLoadFile('batch')
 
 
                     ActionButton:
@@ -198,7 +206,7 @@
 
             Button:
                 text: "Load"
-                on_release: root.load( filechooser.path, filechooser.selection[0])
+                on_release: root.load( filechooser.path, lambda x: filechooser.selection[0] if filechooser.selection else None )
 
 
 <SaveDialog>:

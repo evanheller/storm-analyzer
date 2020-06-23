@@ -34,6 +34,10 @@ import storm_analysis.sa_library.analysis_io as analysisIO
 import storm_analysis.daostorm_3d.mufit_analysis as mfit
 import storm_analysis.sa_utilities.batch_analysis as batch_analysis
 
+# For rendering
+import storm_analysis.sa_utilities.hdf5_to_image as h5render
+import tifffile
+
 # Third-party
 from slider import RangeSlider
 from progressSpinner import ProgressSpinner
@@ -46,6 +50,7 @@ import copy
 from functools import partial
 import threading
 import re
+import glob
 
 
 class Zoom(ScatterLayout):
@@ -210,6 +215,8 @@ class DaxViewer(Zoom):
         self.progressWidget = None
         self.daopath = ""
         self._popup = None
+        self.doRender = False
+        self.doRender3d = False
 
     def addDax(self, filepath):
         self.directory = os.path.dirname(filepath)
@@ -403,9 +410,65 @@ class DaxViewer(Zoom):
             return
 
 
+    def writeTiff(self, img, hdfname, filename):
+        # We'll save full rendering parameters for another program
+        # For now, scale=10, slices = 25
+        pixel_size = None
+
+        try:
+            with h5render.saH5Py.SAH5Py(hdfname) as h5:
+                pixel_size = h5.getPixelSize()/10
+
+        except h5render.saH5Py.SAH5PyException:
+            print("No pixel size information available.")
+
+        with tifffile.TiffWriter(open(filename, "wb")) as tf:
+            if pixel_size is not None:
+                resolution = [1.0e+7/pixel_size, 1.0e+7/pixel_size, 3]
+
+                if numpy.ndim(img) == 3:
+                    for i in range(len(img)):
+                        tf.save(img[i].astype(numpy.float32), resolution=resolution,  metadata={'spacing': (1)/(25+1), 'unit': 'um'})
+                else:
+                    tf.save(img.astype(numpy.float32), resolution=resolution)
+
+            else:
+                if numpy.ndim(img)==3:
+                    for i in range(len(img)):
+                        tf.save(img[i].astype(numpy.float32))
+
+                else:
+                    tf.save(img.astype(numpy.float32))
+
+
+
+    def renderHDF(self, hdfname, show=False):
+        if self.doRender:
+            h=h5render.render2DImage(hdfname, scale=10, sigma=1.6)
+            self.writeTiff(h, hdfname, os.path.splitext(hdfname)[0] + '.tif')
+            
+            # Replace current view with rendered image
+            if show:
+                self.showHDF(os.path.splitext(hdfname)[0] + '.tif') 
+
+        if self.doRender3d:
+            minz=-.5
+            maxz=.5
+            slices=25
+            edges = numpy.arange(minz, maxz, (maxz-minz)/(slices+1))
+            scale=10
+            h = h5render.render3DImage(hdfname, scale = scale, sigma = 1.6, z_edges = edges)
+            self.writeTiff(h, hdfname, os.path.splitext(hdfname)[0] + '_3d.tif')
+
+
+    @mainthread
+    def showHDF(self, hdf):
+        self.addDax(hdf)
+
     def daoBackground(self, moviefile, hdfname, xmlfile):
         try:
             mfit.analyze(moviefile, hdfname, xmlfile)
+            self.renderHDF(hdfname)  # Render if requested
             self.getDaxResults(hdfname)
             self.parent.remove_widget(self.progressWidget)
         except:
@@ -418,6 +481,28 @@ class DaxViewer(Zoom):
         batch_analysis.batchAnalysis(self.daopath + "/mufit_analysis.py", analyzedir + "/", analyzedir + "/", analyzedir + "/" + "current.xml",
                                      max_processes=8)
 
+
+        # Do rendering as requested
+        if self.doRender or self.doRender3d:
+            h5_files = glob.glob(input_directory + "*.h5")
+
+            for hdfname in h5_files:
+               self.renderHDF(hdfname)
+
+        #if self.doRender3d:
+        #    h5_files = glob.glob(input_directory + "*.h5")
+
+        #    for hdfname in h5_files:
+        #        minz=-.5
+        #        maxz=.5
+        #        slices=25
+        #        edges = numpy.arange(minz, maxz, (maxz-minz)/(slices+1))
+        #        scale=10
+        #        image = h5render.render3DImage(hdfname, scale = scale, sigma = 1.6, z_edges = edges)
+        #        self.writeTiff(h, hdfname, hdfname[:-3] + '_3d.tif')
+
+
+        # Clean up
         self.parent.remove_widget(self.progressWidget)
 
 
@@ -487,11 +572,11 @@ class Interface(BoxLayout):
 
     # Assembling some parameters into a hierarchy
     # (analysis parameters are in a flat hierarchy in XML files)
-    node_frequent = ["no_fitting", "drift_correction", "threshold", "sigma", "foreground_sigma", "background_sigma",
+    node_frequent = ["no_fitting", "drift_correction", "start_frame", "max_frame", "threshold", "sigma", "foreground_sigma", "background_sigma",
                      "radius", "find_max_radius" ]
 
     node_camera = ["x_center", "x_start", "x_stop", "y_center", "y_start", "y_stop", "descriptor",
-                   "max_frame", "pixel_size", "start_frame", "camera_gain", "camera_offset", "roi_size",
+                   "pixel_size", "camera_gain", "camera_offset", "roi_size",
                    "static_background_estimate", "aoi_radius"]
 
     node_fitting = ["max_gap", "anscombe", "iterations", "peak_locations", "cutoff"]
@@ -504,11 +589,10 @@ class Interface(BoxLayout):
         super(Interface, self).__init__(**kwargs)
         self.parameters = params.Parameters()
         self.paramWidgets = {}
-        self.seen_attrs = list()
-        self.filename = None
         self._popup = None
         self.selectedFile = ""
         self.daopath = ""
+        self.list_filename = ""
 
         # Populate all the analysis tabs
         for p in Interface.panels:
@@ -578,6 +662,22 @@ class Interface(BoxLayout):
             # Update current parameters
             self.updateParam(spinner)
 
+            # Add in checkbox for rendering
+            n = TreeViewNode(orientation="horizontal", size_hint_y=None, height=sp(24), padding=[sp(18), 0])
+            n.add_widget(Label(text="render tiff",  halign="left"))
+            render_check = CheckBox(active=True)
+            n.add_widget(render_check)
+            self.paramWidgets['render'] = render_check
+            tv.add_node(n)
+
+            # For 3D rendering
+            n = TreeViewNode(orientation="horizontal", size_hint_y=None, height=sp(24), padding=[sp(18), 0])
+            n.add_widget(Label(text="render 3D",  halign="left"))
+            render3d_check = CheckBox(active=False)
+            n.add_widget(render3d_check)
+            self.paramWidgets['render3d'] = render3d_check
+            tv.add_node(n)
+
         # Process some frequently-used params first
         for attr in Interface.node_frequent:
             if attr not in self.paramWidgets.keys():
@@ -635,7 +735,6 @@ class Interface(BoxLayout):
                     else:
                         tv.add_node(n) # Other tabs don't really need branches..
 
-                #TreeWidget.seen_attrs.append(attr)
 
         return tv
 
@@ -658,12 +757,6 @@ class Interface(BoxLayout):
             else:
                 t.nodetype = parameter[0] #'string'
 
-
-            # Bring up a file selection dialog if filename field is clicked
-            #if t.nodetype == 'filename':
-            #    t.bind(focus = self.handleSelectFilename)
-            #else:
-            #    t.bind(focus=self.handleUnfocus)
             if t.nodetype == 'filename':
                 t.bind(on_double_tap=self.handleSelectFilename)
 
@@ -752,15 +845,68 @@ class Interface(BoxLayout):
     def handleTextChange(self, instance, value):
         self.updateParam(instance)
 
+
     def handleAnalyzeFrame(self):
         if self.parameters:
             self.daxviewer.parameters = self.parameters
             self.daxviewer.analyzeFrame()
 
+
     def handleAnalyzeDax(self):
         if self.parameters:
             self.daxviewer.parameters = self.parameters
+
+            if self.paramWidgets['render'].active is True:
+                self.daxviewer.doRender = True
+
+            if self.paramWidgets['render3d'].active is True:
+                self.daxviewer.doRender3d = True
+
             self.daxviewer.analyzeDax()
+
+
+    def handleRender(self):
+        if self.list_filename:
+
+            if self.paramWidgets['render'].active is True:
+                self.daxviewer.doRender = True
+
+            if self.paramWidgets['render3d'].active is True:
+                self.daxviewer.doRender3d = True
+
+            render_thread = threading.Thread(target=self.daxviewer.renderHDF, 
+                    args = (self.list_filename,True), daemon=False)
+
+            render_thread.start()
+
+
+    def handleBatchRender(self, path, filename):
+        self.dismiss_popup()
+
+        # TODO: Probably want to limit number of threads spawned..
+        if not path and not self.daxviewer.directory:
+            return
+
+        if not path:
+            path=self.daxviewer.directory
+
+        if self.paramWidgets['render'].active is True:
+            self.daxviewer.doRender = True
+
+        if self.paramWidgets['render3d'].active is True:
+            self.daxviewer.doRender3d = True
+
+        if self.daxviewer.doRender or self.daxviewer.doRender3d:
+           h5_files = glob.glob(os.path.join(path , "*.h5"))
+           h5_files.extend(glob.glob(os.path.join(path , "*.hdf5")))
+           h5_files.extend(glob.glob(os.path.join(path , "*.hdf")))
+
+           for hdfname in h5_files:
+               render_thread = threading.Thread(target=self.daxviewer.renderHDF, 
+                       args = (hdfname,False), daemon=False)
+
+               render_thread.start()
+
 
     def handleLoadZstring(self):
         content = StringDialog(load=self.loadZstring, cancel=self.dismiss_popup)
@@ -870,6 +1016,16 @@ class Interface(BoxLayout):
             self._popup = Popup(title="Select directory", content=content,
                                 size_hint=(1, 1), pos_hint= {"center_x":0.5,"center_y":.5})
 
+        elif filetype == 'batch':
+            content = LoadDialog(load=self.handleBatchRender, cancel=self.dismiss_popup)
+            content.filechooser.filters=[lambda folder, filename: not filename.endswith('')]
+
+            if self.daxviewer.directory:
+                content.filechooser.path = self.daxviewer.directory
+
+            self._popup = Popup(title="Select directory", content=content,
+                                size_hint=(1, 1), pos_hint= {"center_x":0.5,"center_y":.5})
+
         else:
             content = LoadDialog(load=self.selectFilename, cancel=self.dismiss_popup)
             if self.daxviewer.directory:
@@ -888,6 +1044,13 @@ class Interface(BoxLayout):
             return
 
         self.daxviewer.parameters = self.parameters
+
+        if self.paramWidgets['render'].active is True:
+            self.daxviewer.doRender = True
+
+        if self.paramWidgets['render3d'].active is True:
+            self.daxviewer.doRender3d = True
+
         self.daxviewer.daopath = self.daopath
         self.daxviewer.batchDaoBackground(path)
 
@@ -985,18 +1148,18 @@ class Interface(BoxLayout):
 
 
     def loadMList(self, path, filename):
-        list_filename = os.path.join(path, filename)
+        self.list_filename = os.path.join(path, filename)
 
         if self.daxviewer.locs1_list is not None:
             self.daxviewer.cleanDrawing()
 
-        self.daxviewer.directory = os.path.dirname(list_filename)
+        self.daxviewer.directory = os.path.dirname(self.list_filename)
 
         try:
-            if saH5Py.isSAHDF5(list_filename):
-                self.daxviewer.locs1_list = MoleculeListHDF5(filename = list_filename, parent=self.daxviewer)
+            if saH5Py.isSAHDF5(self.list_filename):
+                self.daxviewer.locs1_list = MoleculeListHDF5(filename = self.list_filename, parent=self.daxviewer)
             else:
-                self.daxviewer.locs1_list = MoleculeListI3(filename = list_filename, parent=self.daxviewer)
+                self.daxviewer.locs1_list = MoleculeListI3(filename = self.list_filename, parent=self.daxviewer)
         except:
             print("Couldn't load mol list")
 
@@ -1008,6 +1171,7 @@ class Interface(BoxLayout):
     def loadDax(self, path, filename):
         try:
             self.daxviewer.addDax(os.path.join(path, filename))
+            self.list_filename = "" # Clear out HDF when new dax is dragged in 
         except:
             print("Something went wrong")
 
@@ -1042,6 +1206,7 @@ class Analyzer(App):
     def build(self):
         root = Interface()
         Window.bind(on_dropfile=self.on_file_drop)
+        self.icon = 'icon.png'
         return root
 
 
@@ -1099,7 +1264,7 @@ class MoleculeList(object):
             # Add ellipse objects
             for i in range(self.locs["x"].size):
                 ig = InstructionGroup()
-                ig.add(Color(0,1,0))
+                ig.add(Color(.3,.7,0))
 
                 x = imgstretch*(self.locs["x"][i] +1 - 0.5*xs[i]*6.0 - 0.5)
                 y = imgstretch*(self.locs["y"][i] +1 - 0.5*ys[i]*6.0 - 0.5) + ytransform
@@ -1202,7 +1367,7 @@ class MoleculeListSingle(MoleculeList):
 
             for i in range(self.locs["x"].size):
                 ig = InstructionGroup()
-                ig.add(Color(0,1,0))
+                ig.add(Color(.3,.7,0))
 
                 x = imgstretch*(self.locs["x"][i] +1 - 0.5*xs[i]*6.0 - 0.5)
                 y = imgstretch*(self.locs["y"][i] +1 - 0.5*ys[i]*6.0 - 0.5) + ytransform
