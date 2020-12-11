@@ -82,10 +82,6 @@
                         dropdown_width: '150dp' 
 
                         ActionButton:
-                            text: 'Set DAO path'
-                            on_press: root.handleLoadFile('dao')
-
-                        ActionButton:
                             text: 'Analyze directory'
                             on_press: root.handleLoadFile('dir')
 
@@ -171,7 +167,8 @@
         TabbedPanel:
             id: analysis_panel
             tab_pos: 'right_top'
-            tab_width: self.parent.width/2.5
+            tab_width: self.parent.height / 3
+            #tab_height: dp(42)
             do_default_tab: False
 
 

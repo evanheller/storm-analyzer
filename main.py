@@ -49,8 +49,10 @@ import sys
 import copy
 from functools import partial
 import threading
+from multiprocessing import Process, Queue
 import re
 import glob
+import contextlib  
 
 
 class Zoom(ScatterLayout):
@@ -213,7 +215,6 @@ class DaxViewer(Zoom):
         self.nm_per_pixel = 167
         self.analyze_thread = None
         self.progressWidget = None
-        self.daopath = ""
         self._popup = None
         self.doRender = False
         self.doRender3d = False
@@ -233,10 +234,12 @@ class DaxViewer(Zoom):
             if elt is not None:
                 elt.cleanUp()
 
-        frame = self.movie_file.loadAFrame(0)
-        self.slider_contrast.min = float(frame.min())
-        self.slider_contrast.max = float(frame.max())
+        frame = self.movie_file.loadAFrame(self.film_l-1)
+        #self.slider_contrast.min = float(frame.min())
+        self.slider_contrast.min = float(0)
         self.slider_contrast.value1 = float(frame.min())
+        frame = self.movie_file.loadAFrame(0)
+        self.slider_contrast.max = float(frame.max()) 
         self.slider_contrast.value2 = float(frame.max())
         self.slider_curframe.value = 0
 
@@ -266,6 +269,8 @@ class DaxViewer(Zoom):
 
         texture = Texture.create(size=(w,h), colorfmt="rgb")
         texture.blit_buffer(frame_RGB.tostring(), bufferfmt="ubyte", colorfmt="rgb")
+        texture.min_filter = 'nearest'
+        texture.mag_filter = 'nearest'
 
         if self.image:
             self.image.texture = texture
@@ -444,7 +449,9 @@ class DaxViewer(Zoom):
 
     def renderHDF(self, hdfname, show=False):
         if self.doRender:
-            h=h5render.render2DImage(hdfname, scale=10, sigma=1.6)
+            with contextlib.redirect_stdout(None):
+                h=h5render.render2DImage(hdfname, scale=10, sigma=1.6)
+
             self.writeTiff(h, hdfname, os.path.splitext(hdfname)[0] + '.tif')
             
             # Replace current view with rendered image
@@ -457,7 +464,10 @@ class DaxViewer(Zoom):
             slices=25
             edges = numpy.arange(minz, maxz, (maxz-minz)/(slices+1))
             scale=10
-            h = h5render.render3DImage(hdfname, scale = scale, sigma = 1.6, z_edges = edges)
+
+            with contextlib.redirect_stdout(None):
+                h = h5render.render3DImage(hdfname, scale = scale, sigma = 1.6, z_edges = edges)
+
             self.writeTiff(h, hdfname, os.path.splitext(hdfname)[0] + '_3d.tif')
 
 
@@ -467,24 +477,71 @@ class DaxViewer(Zoom):
 
     def daoBackground(self, moviefile, hdfname, xmlfile):
         try:
-            mfit.analyze(moviefile, hdfname, xmlfile)
-            self.renderHDF(hdfname)  # Render if requested
-            self.getDaxResults(hdfname)
-            self.parent.remove_widget(self.progressWidget)
+            # Run storm-analysis, suppress stdout 
+            with contextlib.redirect_stdout(None):
+                mfit.analyze(moviefile, hdfname, xmlfile)
+                self.renderHDF(hdfname)  # Render if requested
+                self.getDaxResults(hdfname)
+                self.parent.remove_widget(self.progressWidget)
+
         except:
             self.parent.remove_widget(self.progressWidget)
             return
 
 
-
     def daostormBackground(self, analyzedir):
-        batch_analysis.batchAnalysis(self.daopath + "/mufit_analysis.py", analyzedir + "/", analyzedir + "/", analyzedir + "/" + "current.xml",
-                                     max_processes=8)
+        # Migrate elements of sa.batchAnalysis here to prevent spawning external processes
+        # Setup process queue.
+        process_count = 0
+        results = Queue()
+        procs = []
+        max_processes=4
 
+        daxfiles = glob.glob(os.path.join(analyzedir, "*.dax"))
+
+        for dax in daxfiles:
+            try:
+                # Wait for a process to stop before starting
+                # the next one if we are at the limit.
+                if(process_count >= max_processes):
+                    description = results.get()  # This is blocking
+                    process_count -= 1
+
+                hdfname = os.path.basename(dax[:-4] + ".h5")
+                list_filename = analyzedir + "/" + hdfname
+                proc = Process(target = self.daoBackground, args=(dax, list_filename,
+                    self.directory + "/" + "current.xml"))
+
+                procs.append(proc)
+                proc.start()
+
+                t = threading.Thread(target = self.processWaiter,
+                        args = (proc, "Finished " + dax, results))
+
+                t.daemon = False   # Think about this
+                t.start()
+                process_count += 1
+
+            except KeyboardInterrupt:
+                for proc in procs:
+                    proc.terminate()
+
+                break
+
+        # Wait until all the processes finish.
+        try:
+            while(process_count>0):
+                description = results.get()
+                #print(description)
+                process_count -= 1
+
+        except KeyboardInterrupt:
+            for proc in procs:
+                proc.terminate() 
 
         # Do rendering as requested
         if self.doRender or self.doRender3d:
-            h5_files = glob.glob(input_directory + "*.h5")
+            h5_files = glob.glob(os.path.join(analyzedir, "*.h5"))
 
             for hdfname in h5_files:
                self.renderHDF(hdfname)
@@ -514,10 +571,20 @@ class DaxViewer(Zoom):
         self._popup.open()
 
 
+    def processWaiter(self, aprocess, description, queue):
+        try:
+            aprocess.join() # Join the process and wait for completion
+        finally: 
+            queue.put(description)
+
+   
     def dismiss_popup(self):
-        self._popup.dismiss()
+       self._popup.dismiss()
+
 
     def batchDaoBackground(self, analyzedir):
+       # Launch a thread for batch analysis (which will spawn additional ones)
+
         try:
             self.parameters.toXMLFile(analyzedir + "/" + 'current.xml')
             self.daostorm_thread = threading.Thread(target = self.daostormBackground, args=(analyzedir,))
@@ -540,14 +607,7 @@ class Interface(BoxLayout):
     analysis_panel = ObjectProperty(None)
     panels = ["ParametersDAO",
               "ParametersSCMOS",
-              "ParametersL1H",
-              "ParametersMultiplane",
-              "ParametersMultiplaneArb",
-              "ParametersMultiplaneDao",
-              "ParametersSpliner",
-              "ParametersFISTA",
-              "ParametersPSFFFT",
-              "ParametersPupilFn"]
+              "ParametersSpliner"]
 
     # Mapping between Z-fit params and storm-analysis parameters
     zfitvars = {
@@ -591,7 +651,6 @@ class Interface(BoxLayout):
         self.paramWidgets = {}
         self._popup = None
         self.selectedFile = ""
-        self.daopath = ""
         self.list_filename = ""
 
         # Populate all the analysis tabs
@@ -608,20 +667,7 @@ class Interface(BoxLayout):
             if p == "ParametersDAO":
                 Clock.schedule_once(partial(self.switch, tabitem), 0)
 
-        # Read previous DAOSTORM directory
-        try:
-            f = open("daopath.txt",'r')
-            path = f.readline().rstrip()
-
-            if os.path.exists(path + "/mufit_analysis.py"):
-                self.daopath = path
-
-            f.close()
-
-        except:
-            return
-
-
+        
     def switch(self, tab, *args):
         self.analysis_panel.switch_to(tab)
 
@@ -1040,7 +1086,7 @@ class Interface(BoxLayout):
     def handleBatchAnalyze(self, path, filename):
         self.dismiss_popup()
 
-        if not (self.parameters.hasAttr("threshold") and self.daopath):
+        if not (self.parameters.hasAttr("threshold")):
             return
 
         self.daxviewer.parameters = self.parameters
@@ -1051,31 +1097,7 @@ class Interface(BoxLayout):
         if self.paramWidgets['render3d'].active is True:
             self.daxviewer.doRender3d = True
 
-        self.daxviewer.daopath = self.daopath
         self.daxviewer.batchDaoBackground(path)
-
-
-    def setDaoPath(self, path, filename):
-        if os.path.exists(path + "/mufit_analysis.py"):
-            self.daopath = path
-
-            try:
-                f=open('daopath.txt', 'w')
-                f.write(self.daopath + "\n")
-                f.close()
-            except:
-                pass
-
-            self.dismiss_popup()
-
-        else:
-            self.dismiss_popup()
-            content = PopupDialog(ok=self.dismiss_popup)
-            content.messagelabel.text = "DAOstorm path not correct"
-            self._popup = Popup(title="DAOstorm path", content=content,
-                                size_hint=(.3, .3), pos_hint= {"center_x":0.5,"center_y":.5})
-
-            self._popup.open()
 
 
 
