@@ -1,9 +1,10 @@
 #:import win kivy.core.window
 <Interface>:
-    orientation: 'horizontal'
     daxviewer: daxviewer
     analysis_panel: analysis_panel
     frame_number: frame_number
+
+    orientation: 'horizontal'
     
     FloatLayout:
         FloatLayout:
@@ -284,4 +285,17 @@
                 text: "Load"
                 on_release: root.load(stringinput.text)
 
-    
+<RangeSlider>:
+    Label:
+        pos: (root.value1_pos[0] - sp(16), root.center_y - sp(27)) if root.orientation == 'horizontal' else (root.center_x - sp(27), root.value1_pos[1] - sp(16))
+        size_hint: None,None 
+        size: sp(18), sp(18)
+        text: str(int(root.value1))
+        font_size: sp(12)
+
+    Label:
+        pos: (root.value2_pos[0] - sp(16), root.center_y - sp(27)) if root.orientation == 'horizontal' else (root.center_x - sp(27), root.value2_pos[1] - sp(16))
+        size_hint: None,None 
+        size: sp(18), sp(18)
+        font_size: sp(12)
+        text: str(int(root.value2))

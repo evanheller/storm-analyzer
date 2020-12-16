@@ -11,13 +11,12 @@ use the commandline).
 ## Features ##
 - Drag-and-drop loading of images, STORM parameters, or molecule list files.
 - Image viewer supports zooming and panning to view the results of your fitting.
+- Localization details can be viewed by double-clicking.
 - Parameter fields taking a filename (such as CMOS calibration files) can be double-clicked to bring up a file chooser dialog.
 - Full STORM analysis, including batch processing of directories, can be launched from the GUI.
 - Editable parameters are pulled from your storm-analysis installation, so as storm-analysis parameters evolve, so does the editor.
 - Edited parameters can be exported for use in other workflows.
 
 ## Pre-packaged versions ##
-[macOS](https://github.com/evanheller/storm-analyzer/releases/download/0.2/storm-analyzer.dmg)  
-[Windows](https://github.com/evanheller/storm-analyzer/releases/download/0.2/storm-analyzer.zip)
-
+Needs to be worked out a bit.
 

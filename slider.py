@@ -53,7 +53,7 @@ class RangeSlider(Widget):
     :attr:`value` is a :class:`~kivy.properties.NumericProperty` and defaults
     to 0.'''
 
-    value2 = NumericProperty(100.)
+    value2 = NumericProperty(0.)
     '''Current value used for the second slider.
 
     :attr:`value` is a :class:`~kivy.properties.NumericProperty` and defaults

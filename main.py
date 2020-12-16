@@ -20,6 +20,7 @@ from kivy.core.window import Window
 from kivy.metrics import sp
 from kivy.clock import Clock, mainthread
 from kivy.uix.popup import Popup
+from kivy.uix.modalview import ModalView
 
 # storm-analysis stuff
 import storm_analysis.sa_library.datareader as datareader
@@ -141,6 +142,10 @@ class Zoom(ScatterLayout):
 
         return changed
 
+    def modalDismiss(self, something):
+        self.cleanDrawing()
+        self.redrawFits(None, None)
+
     def on_touch_down(self, touch):
         x, y = touch.x, touch.y
         self.prev_x = touch.x
@@ -151,15 +156,48 @@ class Zoom(ScatterLayout):
             if not self.collide_point(x, y):
                 return False
 
-        if touch.is_mouse_scrolling:
-            if touch.button == 'scrolldown':
-                ## zoom in
-                if self.scale < 10:
-                    self.scale = self.scale * 1.1
+        # Add double-click functionality to bring up fit properties
+        # divide final position by self.scale
+        if touch.is_double_tap:
+            px = (touch.x - self.pos[0]) / self.scale   
+            py = (touch.y - self.pos[1]) / self.scale
 
-            elif touch.button == 'scrollup':
-                if self.scale > 0.5:
-                    self.scale = self.scale * 0.8
+            try:
+                locinfo = self.locs1_list.getClosest(px, py)
+                view=ModalView(size_hint=(self.analysis_panel.width/Window.size[0], 1), pos_hint={'right': 1}, overlay_color = [0,0,0,.2])
+
+                # TreeView for showing localization details
+                tv=TreeView(hide_root=True)
+                tv.size_hint_y =.8 
+                tv.bind(minimum_height=tv.setter('height'))
+
+                n = TreeViewNode(orientation="horizontal", size_hint_y=None,height=sp(24), padding=[0, sp(24)])
+                n.add_widget(Label(text="Localization information",  halign="center"))
+                tv.add_node(n)
+
+                for f in locinfo:
+                    n = TreeViewNode(orientation="horizontal", size_hint_y=None,height=sp(24))
+                    n.add_widget(Label(text=f,  halign="left", bold=True))
+                    n.add_widget(Label(text=str(float("{0:.3f}".format(locinfo[f]))),  halign="left"))
+                    tv.add_node(n)
+
+                view.add_widget(tv)
+                view.bind(on_dismiss=self.modalDismiss)
+                view.open()
+
+            except:
+                pass
+
+        else:
+            if touch.is_mouse_scrolling:
+                if touch.button == 'scrolldown':
+                    ## zoom in
+                    if self.scale < 10:
+                        self.scale = self.scale * 1.1
+
+                elif touch.button == 'scrollup':
+                    if self.scale > 0.5:
+                        self.scale = self.scale * 0.8
 
 
         # let the child widgets handle the event if they want
@@ -218,6 +256,7 @@ class DaxViewer(Zoom):
         self._popup = None
         self.doRender = False
         self.doRender3d = False
+        self.analysis_panel = None
 
     def addDax(self, filepath):
         self.directory = os.path.dirname(filepath)
@@ -652,16 +691,17 @@ class Interface(BoxLayout):
         self._popup = None
         self.selectedFile = ""
         self.list_filename = ""
+        self.daxviewer.analysis_panel = self.analysis_panel
 
         # Populate all the analysis tabs
         for p in Interface.panels:
             tabitem = TabbedPanelItem(text=p[10:])
-            self.analysis_panel.add_widget(tabitem)
             sv = ScrollView(size=self.size, smooth_scroll_end=10)
             tabitem.add_widget(sv)
 
             treeview=self.makeTree(getattr(params, p)())
             sv.add_widget(treeview)
+            self.analysis_panel.add_widget(tabitem)
 
             # This is to select the first tab by default after initialization
             if p == "ParametersDAO":
@@ -1170,6 +1210,9 @@ class Interface(BoxLayout):
 
 
     def loadMList(self, path, filename):
+        if self.daxviewer.movie_file is None:
+            return
+
         self.list_filename = os.path.join(path, filename)
 
         if self.daxviewer.locs1_list is not None:
@@ -1297,7 +1340,6 @@ class MoleculeList(object):
                 y = imgstretch*(self.locs["y"][i] +1 - 0.5*ys[i]*6.0 - 0.5) + ytransform
 
                 ig.add( Line( width=1.5, ellipse = (x, y, xs[i]*6.0*imgstretch, ys[i]*6.0*imgstretch)))
-
                 self.mol_items.append(ig)
 
                 #self.mol_items.append(MoleculeItem(self.locs["x"][i] + 1,
@@ -1318,17 +1360,33 @@ class MoleculeList(object):
         """
         vals = {}
         if bool(self.locs) and (self.locs["x"].size > 0):
+            if "xsigma" in self.locs:
+                xs = self.locs["xsigma"]
+                ys = self.locs["ysigma"]
+            else:
+                xs = 1.5*numpy.ones(self.locs["x"].size)
+                ys = 1.5*numpy.ones(self.locs["x"].size)
+
+
+            # For scaling of clicked region to image coordinates
+            imgstretch = self.parent.image.norm_image_size[0]/self.parent.image.texture_size[0]
+            ytransform = (self.parent.size[1] - self.parent.image.norm_image_size[1])/2
 
             # Find the one nearest to px, py.
-            dx = self.locs["x"] - px - 0.5
-            dy = self.locs["y"] - py - 0.5
+            dx = self.locs["x"] - px/imgstretch - 0.5
+            dy = self.locs["y"] - (py-ytransform)/imgstretch - 0.5
             dist = dx*dx+dy*dy
             closest_index = numpy.argmin(dist)
+            
+            # Highlight the selected localization
+            ig = InstructionGroup()
+            ig.add(Color(.9,.9,0))
 
-            # Unmark old item, mark new item
-            self.mol_items[self.last_index].setMarked(False)
-            self.mol_items[closest_index].setMarked(True)
-            self.last_index = closest_index
+            x = imgstretch*(self.locs["x"][closest_index] +1 - 0.5*xs[closest_index]*6.0 - 0.5)
+            y = imgstretch*(self.locs["y"][closest_index] +1 - 0.5*ys[closest_index]*6.0 - 0.5) + ytransform
+            ig.add( Line( width=2, ellipse = (x, y, xs[closest_index]*6.0*imgstretch, ys[closest_index]*6.0*imgstretch)))
+            self.mol_items.append(ig)
+            self.parent.canvas.add(ig)
 
             # Create a dictionary containing the data for this molecule.
             vals = {}
