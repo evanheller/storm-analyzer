@@ -261,9 +261,6 @@ class DaxViewer(Zoom):
     def addDax(self, filepath):
         self.directory = os.path.dirname(filepath)
         self.movie_file = datareader.inferReader(filepath)
-
-        self.directory = os.path.dirname(filepath)
-        self.movie_file = datareader.inferReader(filepath)
         [self.film_x, self.film_y, self.film_l] = self.movie_file.filmSize()
         self.slider_curframe.max = self.film_l - 1
         self.cur_frame = 0
@@ -278,14 +275,14 @@ class DaxViewer(Zoom):
         self.slider_contrast.min = float(0)
         self.slider_contrast.value1 = float(frame.min())
         frame = self.movie_file.loadAFrame(0)
-        self.slider_contrast.max = float(frame.max()) 
+        self.slider_contrast.max = float(frame.max()*3)  # 5/2 
         self.slider_contrast.value2 = float(frame.max())
         self.slider_curframe.value = 0
 
         self.locs1_list = None
         self.locs2_list = None
 
-        self.incCurFrame(0)
+        self.incCurFrame()
 
 
     def newFrame(self, frame, locs1, locs2, fmin, fmax):
@@ -335,7 +332,7 @@ class DaxViewer(Zoom):
         if self.movie_file:
 
             # Get the current frame.
-            frame = self.movie_file.loadAFrame(self.cur_frame).astype(numpy.float)
+            frame = self.movie_file.loadAFrame(self.cur_frame).astype(float)
 
             # Create localization list 1 molecule items.
             try:
